@@ -7,6 +7,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.support.v4.view.GestureDetectorCompat;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -21,6 +22,7 @@ public class MoveableView extends View {
     private Paint mBodyPaint;
     private Paint mTopRectPaint;
     private Paint mBottomRectPaint;
+    private final int MIN_BODY_HEIGHT = 100;
 
     private GestureDetectorCompat mDetector;
 
@@ -85,26 +87,49 @@ public class MoveableView extends View {
 
     private class MyGestureListener extends GestureDetector.SimpleOnGestureListener {
         private float lastValue = 0;
+        private Rect touchedRect;
 
         @Override
         public boolean onScroll(MotionEvent startedMotion, MotionEvent endMotion, float distanceX, float distanceY) {
-            switch(endMotion.getAction()) {
-                case MotionEvent.ACTION_MOVE:
-                    float scrolledSize = (endMotion.getY() - startedMotion.getY());
-                    mBodyRect.bottom += scrolledSize - lastValue;
-                    lastValue = scrolledSize;
-                    invalidate();
-                    break;
-                case MotionEvent.ACTION_UP:
-                    lastValue = 0;
-                    break;
+            if(endMotion.getAction() == MotionEvent.ACTION_MOVE && touchedRect != null) {
+                float scrolledSize = (endMotion.getY() - startedMotion.getY());
+                float scrolledOffset = scrolledSize - lastValue;
+
+                mBodyRect.bottom += scrolledOffset;
+                int rectHeight = touchedRect.height();
+                touchedRect.top += scrolledOffset;
+                touchedRect.bottom = touchedRect.top + rectHeight;
+                lastValue = scrolledSize;
+                invalidate();
             }
 
             return true;
         }
 
+        private Rect getTouchedRect(MotionEvent event) {
+            if(isTouchInsideARect(event, mTopRect)) {
+                return mTopRect;
+            } else if(isTouchInsideARect(event, mBottomRect)) {
+                return mBottomRect;
+            } else {
+                return null;
+            }
+        }
+
+        private boolean isTouchInsideARect(MotionEvent event, Rect rect) {
+            return (event.getX() >= rect.left && event.getX() <= rect.right) &&
+                    (event.getY() >= rect.top && event.getY() <= rect.bottom);
+        }
+
         @Override
         public boolean onDown(MotionEvent e) {
+            touchedRect = getTouchedRect(e);
+
+            if(touchedRect == null) {
+                lastValue = 0;
+                return false;
+            }
+
             return true;
         }
     }
