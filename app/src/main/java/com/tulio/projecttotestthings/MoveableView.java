@@ -7,7 +7,6 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.support.v4.view.GestureDetectorCompat;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -16,15 +15,21 @@ import android.view.View;
  * Created by tulio on 3/31/16.
  */
 public class MoveableView extends View {
-    private Rect mBodyRect;
-    private Rect mTopRect;
-    private Rect mBottomRect;
-    private Paint mBodyPaint;
-    private Paint mTopRectPaint;
-    private Paint mBottomRectPaint;
+    private enum RectType {
+        UP, DOWN
+    }
+
     private final int MIN_BODY_HEIGHT = 100;
 
+    private Rect mBodyRect;
+    private Rect mResizableTopRect;
+    private Rect mResizableBottomRect;
+    private Paint mBodyPaint;
+    private Paint mResizableTopRectPaint;
+    private Paint mResizableBottomRectPaint;
+
     private GestureDetectorCompat mDetector;
+    private boolean showResizableRect = false;
 
     public MoveableView(Context context) {
         this(context, null);
@@ -52,20 +57,20 @@ public class MoveableView extends View {
         marginLeft = 200;
         marginTop = 200;
 
-        mTopRect = new Rect(marginLeft, marginTop, rectWidth, rectHeight);
-        mTopRectPaint = new Paint();
-        mTopRectPaint.setColor(Color.RED);
-        mTopRectPaint.setStyle(Paint.Style.FILL);
+        mResizableTopRect = new Rect(marginLeft, marginTop, rectWidth, rectHeight);
+        mResizableTopRectPaint = new Paint();
+        mResizableTopRectPaint.setColor(Color.RED);
+        mResizableTopRectPaint.setStyle(Paint.Style.FILL);
 
         rectWidth = 500;
         rectHeight = 300;
         marginLeft = 200;
         marginTop = 280;
 
-        mBottomRect = new Rect(marginLeft, marginTop, rectWidth, rectHeight);
-        mBottomRectPaint = new Paint();
-        mBottomRectPaint.setColor(Color.RED);
-        mBottomRectPaint.setStyle(Paint.Style.FILL);
+        mResizableBottomRect = new Rect(marginLeft, marginTop, rectWidth, rectHeight);
+        mResizableBottomRectPaint = new Paint();
+        mResizableBottomRectPaint.setColor(Color.RED);
+        mResizableBottomRectPaint.setStyle(Paint.Style.FILL);
 
         mDetector = new GestureDetectorCompat(getContext(), new MyGestureListener());
     }
@@ -75,8 +80,11 @@ public class MoveableView extends View {
         super.onDraw(canvas);
 
         canvas.drawRect(mBodyRect, mBodyPaint);
-        canvas.drawRect(mTopRect, mTopRectPaint);
-        canvas.drawRect(mBottomRect, mBottomRectPaint);
+
+        if(showResizableRect) {
+            canvas.drawRect(mResizableTopRect, mResizableTopRectPaint);
+            canvas.drawRect(mResizableBottomRect, mResizableBottomRectPaint);
+        }
     }
 
     @Override
@@ -86,31 +94,58 @@ public class MoveableView extends View {
     }
 
     private class MyGestureListener extends GestureDetector.SimpleOnGestureListener {
-        private float lastValue = 0;
-        private Rect touchedRect;
+        private TouchedRect touchedRect;
+
+        @Override
+        public boolean onDown(MotionEvent event) {
+            if(showResizableRect && !isTouchInsideARect(event, mBodyRect)) {
+                showResizableRect = false;
+                invalidate();
+
+                return false;
+            }
+
+            touchedRect = getTouchedRect(event);
+
+            if(touchedRect == null) {
+                return false;
+            }
+
+            return true;
+        }
+
+        @Override
+        public void onLongPress(MotionEvent event) {
+            if(!showResizableRect && isTouchInsideARect(event, mBodyRect)) {
+                showResizableRect = true;
+                invalidate();
+            }
+        }
 
         @Override
         public boolean onScroll(MotionEvent startedMotion, MotionEvent endMotion, float distanceX, float distanceY) {
             if(endMotion.getAction() == MotionEvent.ACTION_MOVE && touchedRect != null) {
-                float scrolledSize = (endMotion.getY() - startedMotion.getY());
-                float scrolledOffset = scrolledSize - lastValue;
+                if(touchedRect.rectType == RectType.UP) {
+                    mBodyRect.top -= distanceY;
+                } else {
+                    mBodyRect.bottom -= distanceY;
+                }
 
-                mBodyRect.bottom += scrolledOffset;
-                int rectHeight = touchedRect.height();
-                touchedRect.top += scrolledOffset;
-                touchedRect.bottom = touchedRect.top + rectHeight;
-                lastValue = scrolledSize;
+                int touchedRectHeight = touchedRect.rect.height();
+                touchedRect.rect.top -= distanceY;
+                touchedRect.rect.bottom = touchedRect.rect.top + touchedRectHeight;
+
                 invalidate();
             }
 
             return true;
         }
 
-        private Rect getTouchedRect(MotionEvent event) {
-            if(isTouchInsideARect(event, mTopRect)) {
-                return mTopRect;
-            } else if(isTouchInsideARect(event, mBottomRect)) {
-                return mBottomRect;
+        private TouchedRect getTouchedRect(MotionEvent event) {
+            if(isTouchInsideARect(event, mResizableTopRect)) {
+                return new TouchedRect(mResizableTopRect, RectType.UP);
+            } else if(isTouchInsideARect(event, mResizableBottomRect)) {
+                return new TouchedRect(mResizableBottomRect, RectType.DOWN);
             } else {
                 return null;
             }
@@ -121,16 +156,14 @@ public class MoveableView extends View {
                     (event.getY() >= rect.top && event.getY() <= rect.bottom);
         }
 
-        @Override
-        public boolean onDown(MotionEvent e) {
-            touchedRect = getTouchedRect(e);
+        private class TouchedRect {
+            public Rect rect;
+            public RectType rectType;
 
-            if(touchedRect == null) {
-                lastValue = 0;
-                return false;
+            public TouchedRect(Rect rect, RectType rectType) {
+                this.rect = rect;
+                this.rectType = rectType;
             }
-
-            return true;
         }
     }
 }
