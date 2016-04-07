@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="MoveableViewAttrs">
+        <attr name="mv_text_margin_top" format="dimension" />
+        <attr name="mv_text_margin_left" format="dimension" />
+    </declare-styleable>
+</resources>

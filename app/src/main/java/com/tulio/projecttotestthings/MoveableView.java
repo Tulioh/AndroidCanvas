@@ -1,11 +1,13 @@
 package com.tulio.projecttotestthings;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.support.v4.view.GestureDetectorCompat;
+import android.text.TextPaint;
 import android.util.AttributeSet;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
@@ -16,10 +18,12 @@ import android.view.View;
  */
 public class MoveableView extends View {
     private enum RectType {
-        UP, DOWN
+        TOP, BOTTOM
     }
 
     private final int MIN_BODY_HEIGHT = 100;
+    private final float TEXT_MARGIN_TOP;
+    private final float TEXT_MARGIN_LEFT;
 
     private Rect mBodyRect;
     private Rect mResizableTopRect;
@@ -27,6 +31,9 @@ public class MoveableView extends View {
     private Paint mBodyPaint;
     private Paint mResizableTopRectPaint;
     private Paint mResizableBottomRectPaint;
+    private TextPaint mBodyTextPaint;
+    private float mTextMarginTop;
+    private float mTextMarginLeft;
 
     private GestureDetectorCompat mDetector;
     private boolean showResizableRect = false;
@@ -38,39 +45,44 @@ public class MoveableView extends View {
     public MoveableView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
+        TypedArray typedArray = context.obtainStyledAttributes(
+                attrs,R.styleable.MoveableViewAttrs, 0, 0);
+
+        TEXT_MARGIN_TOP = typedArray.getDimension(
+                R.styleable.MoveableViewAttrs_mv_text_margin_top, 40);
+        TEXT_MARGIN_LEFT = typedArray.getDimension(
+                R.styleable.MoveableViewAttrs_mv_text_margin_left, 30);
+
         initialize();
     }
 
     private void initialize() {
-        int rectWidth = 500;
-        int rectHeight = 300;
-        int marginLeft = 200;
-        int marginTop = 200;
-
-        mBodyRect = new Rect(marginLeft, marginTop, rectWidth, rectHeight);
+        mBodyRect = new Rect(200, 200, 500, 300);
         mBodyPaint = new Paint();
         mBodyPaint.setColor(Color.BLACK);
         mBodyPaint.setStyle(Paint.Style.FILL);
 
-        rectWidth = 500;
-        rectHeight = 220;
-        marginLeft = 200;
-        marginTop = 200;
+        final int RECT_OFFSET = (int) (mBodyRect.top * 0.4);
 
-        mResizableTopRect = new Rect(marginLeft, marginTop, rectWidth, rectHeight);
+        mResizableTopRect = new Rect(mBodyRect.left, mBodyRect.top, mBodyRect.right,
+                mBodyRect.bottom - RECT_OFFSET);
         mResizableTopRectPaint = new Paint();
         mResizableTopRectPaint.setColor(Color.RED);
         mResizableTopRectPaint.setStyle(Paint.Style.FILL);
 
-        rectWidth = 500;
-        rectHeight = 300;
-        marginLeft = 200;
-        marginTop = 280;
-
-        mResizableBottomRect = new Rect(marginLeft, marginTop, rectWidth, rectHeight);
+        mResizableBottomRect = new Rect(mBodyRect.left, mBodyRect.top + RECT_OFFSET,
+                mBodyRect.right, mBodyRect.bottom);
         mResizableBottomRectPaint = new Paint();
         mResizableBottomRectPaint.setColor(Color.RED);
         mResizableBottomRectPaint.setStyle(Paint.Style.FILL);
+
+        mTextMarginTop = mBodyRect.top + TEXT_MARGIN_TOP;
+        mTextMarginLeft = mBodyRect.left + TEXT_MARGIN_LEFT;
+
+        mBodyTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        mBodyTextPaint.setColor(Color.WHITE);
+        mBodyTextPaint.setTextSize(getResources().getDimension(R.dimen.default_text_size));
+        mBodyTextPaint.setStyle(Paint.Style.FILL);
 
         mDetector = new GestureDetectorCompat(getContext(), new MyGestureListener());
     }
@@ -80,6 +92,7 @@ public class MoveableView extends View {
         super.onDraw(canvas);
 
         canvas.drawRect(mBodyRect, mBodyPaint);
+        canvas.drawText("Test", mTextMarginLeft, mTextMarginTop, mBodyTextPaint);
 
         if(showResizableRect) {
             canvas.drawRect(mResizableTopRect, mResizableTopRectPaint);
@@ -125,8 +138,9 @@ public class MoveableView extends View {
         @Override
         public boolean onScroll(MotionEvent startedMotion, MotionEvent endMotion, float distanceX, float distanceY) {
             if(endMotion.getAction() == MotionEvent.ACTION_MOVE && touchedRect != null) {
-                if(touchedRect.rectType == RectType.UP) {
+                if(touchedRect.rectType == RectType.TOP) {
                     mBodyRect.top -= distanceY;
+                    mTextMarginTop = mBodyRect.top + TEXT_MARGIN_TOP;
                 } else {
                     mBodyRect.bottom -= distanceY;
                 }
@@ -142,10 +156,10 @@ public class MoveableView extends View {
         }
 
         private TouchedRect getTouchedRect(MotionEvent event) {
-            if(isTouchInsideARect(event, mResizableTopRect)) {
-                return new TouchedRect(mResizableTopRect, RectType.UP);
-            } else if(isTouchInsideARect(event, mResizableBottomRect)) {
-                return new TouchedRect(mResizableBottomRect, RectType.DOWN);
+            if(showResizableRect && isTouchInsideARect(event, mResizableTopRect)) {
+                return new TouchedRect(mResizableTopRect, RectType.TOP);
+            } else if(showResizableRect && isTouchInsideARect(event, mResizableBottomRect)) {
+                return new TouchedRect(mResizableBottomRect, RectType.BOTTOM);
             } else {
                 return null;
             }
